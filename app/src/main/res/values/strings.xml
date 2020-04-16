@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">gameAppPractice_animation</string>
+    <string name="description">ball</string>
+    <string name="button">スタート</string>
+    <string name="background">backGround</string>
+    <string name="black">black</string>
+</resources>
