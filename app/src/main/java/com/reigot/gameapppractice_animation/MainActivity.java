@@ -42,8 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private float ClothGirlDefaultY;
 
     //ジャンプ処理
-    private boolean isJumping;
-    private boolean isFirstJumping;
+    private JumpingPhase jumpingPhase = JumpingPhase.standby;
     private int delay;
     private float jumpingPower;
 
@@ -57,8 +56,9 @@ public class MainActivity extends AppCompatActivity {
         static final int FIRST_JUMPING_DELAY = 0;
         static final int SECOND_JUMPING_DELAY = 30;
         static final int JUMP_TIMER_TASK_PERIOD = 9;
-        static final float FIRST_JUMPING_POWER_BASE = 15.0f;  //judgeJumpingSituationにて "4.0f * scale" に足す数。
-        static final float SECOND_JUMPING_POWER_BASE = 16.0f; //judgeJumpingSituationにて "4.0f * scale" に足す数。
+        static final float JUMPING_POWER_COEFFICIENT = 5.1f;
+        static final float FIRST_JUMPING_POWER_BASE = 13.0f;
+        static final float SECOND_JUMPING_POWER_BASE = 12.0f;
     }
 
     @Override
@@ -79,14 +79,16 @@ public class MainActivity extends AppCompatActivity {
         loadGifAnimation();
 
         //BGMの再生。
-        playBGM(R.raw.main);
+        playBgm(R.raw.main);
 
         //SEの再生準備。
         //入力したパスはsoundIdMapのkeyとして登録される。（可変長引数）
-        prepareSE(R.raw.jump);
+        prepareSe(R.raw.jump);
 
         //TO DO: 障害物（机）を準備。
     }
+
+
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -112,14 +114,14 @@ public class MainActivity extends AppCompatActivity {
         Glide.with(this).load(R.raw.zoukin_girl_run).into(ivClothGirl);
     }
 
-    public void playBGM(int bgmFilePath) {
+    public void playBgm(int bgmFilePath) {
         mediaPlayer = MediaPlayer.create(this, bgmFilePath);
         mediaPlayer.setVolume(MagicNumberManager.MAIN_BGM_VOLUME, MagicNumberManager.MAIN_BGM_VOLUME);
         mediaPlayer.setLooping(true);
         mediaPlayer.start();
     }
 
-    public void prepareSE(int ... seFilePath) {
+    public void prepareSe(int ... seFilePath) {
         //サウンドプールの用意
         SoundPool.Builder builder = new SoundPool.Builder().setMaxStreams(1);
         soundPool = builder.build();
@@ -132,31 +134,38 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void playSE(int seFilePath, float volume, float rate) {
+    public void playSe(int seFilePath, float volume, float rate) {
         soundPool.play(soundIdMap.get(seFilePath), volume, volume, 0, 0, rate);
     }
 
+    enum JumpingPhase {
+        standby,
+        firstJump,
+        secondJump
+    }
     public void judgeJumpingSituation() {
-        final float FIRST_JUMPING_POWER = 4.0f * scale + MagicNumberManager.FIRST_JUMPING_POWER_BASE;
-        final float SECOND_JUMPING_POWER = 4.0f * scale + MagicNumberManager.SECOND_JUMPING_POWER_BASE;
+        final float firstJumpingPower = scale * MagicNumberManager.JUMPING_POWER_COEFFICIENT + MagicNumberManager.FIRST_JUMPING_POWER_BASE;
+        final float secondJumpingPower = scale * MagicNumberManager.JUMPING_POWER_COEFFICIENT + MagicNumberManager.SECOND_JUMPING_POWER_BASE;
 
-        if (!(isJumping)) {
-            //ジャンプ中でなければ1段目のジャンプをする。
-            isJumping = true;
-            isFirstJumping = true;
-            playSE(R.raw.jump, MagicNumberManager.JUMP_SE_VOLUME, MagicNumberManager.JUMP_SE_RATE);
-            ClothGirlDefaultY = clothGirlY = ivClothGirl.getY();
-            delay = MagicNumberManager.FIRST_JUMPING_DELAY;
-            jumpingPower = FIRST_JUMPING_POWER;
-            startJumping();
-        } else if (isFirstJumping) {
-            //1段目のジャンプ中ならば2段目のジャンプをする。
-            isFirstJumping = false;
-            playSE(R.raw.jump, MagicNumberManager.JUMP_SE_VOLUME, MagicNumberManager.JUMP_SE_RATE);
-            delay = MagicNumberManager.SECOND_JUMPING_DELAY;
-            jumpingPower = SECOND_JUMPING_POWER;
-            jumpTimer.cancel();
-            startJumping();
+        switch (jumpingPhase) {
+            case standby: //ジャンプ中でなければ1段目のジャンプをする。
+                jumpingPhase = JumpingPhase.firstJump;
+                playSe(R.raw.jump, MagicNumberManager.JUMP_SE_VOLUME, MagicNumberManager.JUMP_SE_RATE);
+                ClothGirlDefaultY = clothGirlY = ivClothGirl.getY();
+                delay = MagicNumberManager.FIRST_JUMPING_DELAY;
+                jumpingPower = firstJumpingPower;
+                startJumping();
+                break;
+            case firstJump: //1段目のジャンプ中ならば2段目のジャンプをする。
+                jumpingPhase = JumpingPhase.secondJump;
+                playSe(R.raw.jump, MagicNumberManager.JUMP_SE_VOLUME, MagicNumberManager.JUMP_SE_RATE);
+                delay = MagicNumberManager.SECOND_JUMPING_DELAY;
+                jumpingPower = secondJumpingPower;
+                jumpTimer.cancel();
+                startJumping();
+                break;
+            case secondJump: //二段目のジャンプ中には何も処理をしない。（今後処理を追加する可能性あり）
+                break;
         }
     }
 
@@ -188,8 +197,7 @@ public class MainActivity extends AppCompatActivity {
                         //キャラクターが元の高さに戻ったらジャンプアクションを終了する。
                         clothGirlY = ClothGirlDefaultY;
                         ivClothGirl.setY(clothGirlY);
-                        isJumping = false;
-                        isFirstJumping = false;
+                        jumpingPhase = JumpingPhase.standby;
                         loadGifAnimation();
                         jumpTimer.cancel();
                     }
